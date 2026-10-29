@@ -9,10 +9,10 @@ The interface switches among three datasets without pooling them:
 | Dataset | Supported unit and target | Local status |
 | --- | --- | --- |
 | Shanghai T2D | CGM value 15, 30, or 60 minutes ahead | Ready when `results/` has been generated. |
-| Diabetes 130-US Hospitals | Future encounter outcome, such as readmission | Disabled until `data/us_diabetes_130/diabetic_data.csv` is supplied and audited. |
-| MIMIC-IV Demo | Documented encounter-level outcome | Disabled until `data/mimic_iv_demo/admissions.csv` or `.csv.gz` is supplied and audited. |
+| Diabetes 130-US Hospitals | Readmission within 30 days | Ready: a separate patient-held-out encounter evaluation. |
+| MIMIC-IV Demo | In-hospital mortality | Ready: a separate admission-time feasibility evaluation. |
 
-The other datasets are deliberately unavailable until their data and target definitions are audited. The application never invents an accuracy score, forecast, or patient record for missing data.
+The datasets are never pooled. The two hospital datasets are not CGM trajectories: they show a documented encounter state and a held-out binary-outcome evaluation, while Shanghai T2D shows a short-term CGM forecast.
 
 ## Patient state representation
 
@@ -29,7 +29,7 @@ This is a computational state representation for research. It is not a biologica
 
 The Shanghai pipeline uses standard scikit-learn models: persistence, ridge regression, random forest, and histogram gradient boosting. Evaluation holds out entire patients. The primary accuracy measure is subject-macro mean absolute error (MAE) in mg/dL.
 
-No RNN is included. The current datasets do not share a validated longitudinal target or comparable time scale, so an RNN would add complexity without a fair, supported cross-dataset evaluation.
+No RNN is included. The sources do not share a validated longitudinal target or comparable time scale, so an RNN would add complexity without a fair, supported cross-dataset evaluation.
 
 ## Run Shanghai preprocessing
 
@@ -40,6 +40,17 @@ The supplied Shanghai data stay local and are not committed to Git.
 ```
 
 This writes four private local result tables required by the React interface: held-out forecasts, aggregate metrics, participant metrics, and glucose-range agreement counts.
+
+## Run the hospital-dataset evaluations
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_encounter_evaluations.py
+```
+
+This runs independent patient-held-out studies and writes three result tables for each source: metrics, held-out record predictions, and a confusion matrix. The source modules are intentionally separate for presentation clarity:
+
+- `src/us_diabetes_130.py` — 30-day readmission; model sections are marked with `# Model:` comments.
+- `src/mimic_iv_demo.py` — in-hospital mortality; model sections are marked with `# Model:` comments.
 
 ## Run the React application
 
@@ -72,6 +83,9 @@ For frontend development, run `npm --prefix frontend run dev` and open `http://1
 api/                       Python API and dataset catalogue
 frontend/                  React interface
 src/shanghai_t2d/          Shanghai preprocessing and standard models
+src/us_diabetes_130.py     US hospital readmission pipeline
+src/mimic_iv_demo.py       MIMIC-IV Demo mortality pipeline
+src/encounter_common.py    Shared patient-held-out evaluation mechanics
 scripts/run_basic.py       Shanghai evaluation runner
 scripts/run_react_api.py   React API runner
 configs/study.json         Fixed Shanghai evaluation settings

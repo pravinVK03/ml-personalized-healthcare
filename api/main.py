@@ -11,7 +11,7 @@ from starlette.routing import Route
 from starlette.staticfiles import StaticFiles
 
 from .catalog import DATASETS, ROOT, all_datasets, dataset_summary
-from . import shanghai
+from . import encounters, shanghai
 
 
 def response(data: object) -> JSONResponse:
@@ -28,8 +28,8 @@ async def dataset_overview(request):
         data = dataset_summary(dataset_id)
     except KeyError:
         return response({"error": "Unknown dataset"}, status_code=404)
-    if dataset_id == "shanghai_t2d" and data["status"] == "ready":
-        data["evaluation"] = shanghai.overview()
+    if data["status"] == "ready":
+        data["evaluation"] = shanghai.overview() if dataset_id == "shanghai_t2d" else encounters.overview(dataset_id)
     return response(data)
 
 
@@ -92,6 +92,24 @@ async def range_agreement(request):
         return response({"error": str(error)}, status_code=400)
 
 
+async def encounter_records(request):
+    dataset_id = request.path_params["dataset_id"]
+    if dataset_id == "shanghai_t2d" or dataset_summary(dataset_id)["status"] != "ready":
+        return response({"error": "Encounter records are not available for this dataset."}, status_code=409)
+    model = request.query_params.get("model", "logistic_regression")
+    return response({"records": encounters.record_list(dataset_id, model)})
+
+
+async def encounter_state(request):
+    dataset_id = request.path_params["dataset_id"]
+    if dataset_id == "shanghai_t2d" or dataset_summary(dataset_id)["status"] != "ready":
+        return response({"error": "Encounter records are not available for this dataset."}, status_code=409)
+    try:
+        return response(encounters.record_state(dataset_id, request.path_params["record_id"], request.query_params.get("model", "logistic_regression")))
+    except KeyError as error:
+        return response({"error": str(error)}, status_code=400)
+
+
 async def index(_request):
     index_path = ROOT / "frontend" / "dist" / "index.html"
     if index_path.exists():
@@ -107,6 +125,8 @@ routes = [
     Route("/api/datasets/{dataset_id}/participants/{subject_id}/state", participant_state),
     Route("/api/datasets/{dataset_id}/participant-error", participant_error),
     Route("/api/datasets/{dataset_id}/range-agreement", range_agreement),
+    Route("/api/datasets/{dataset_id}/records", encounter_records),
+    Route("/api/datasets/{dataset_id}/records/{record_id}", encounter_state),
     Route("/", index),
 ]
 

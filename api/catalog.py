@@ -13,6 +13,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS = ROOT / "results"
 
+
+def discovered_data_path(folder: str, filename: str) -> Path:
+    root = ROOT / "data" / folder
+    matches = sorted(root.rglob(filename))
+    return matches[0] if matches else root / filename
+
 DATASETS = {
     "shanghai_t2d": {
         "id": "shanghai_t2d",
@@ -28,21 +34,21 @@ DATASETS = {
         "id": "us_diabetes_130",
         "name": "Diabetes 130-US Hospitals",
         "setting": "Hospital encounters",
-        "target": "A carefully defined future encounter outcome, such as readmission",
-        "state_definition": "Encounter history available before the selected prediction time",
+        "target": "Readmission within 30 days",
+        "state_definition": "Index hospital-encounter summary at discharge",
         "models": ["Logistic regression", "Random forest", "Histogram gradient boosting"],
         "limitations": "HbA1c is categorical and must not be treated as a numerical HbA1c time series. Encounter ordering must be audited before temporal claims.",
-        "required": [Path(os.environ.get("US_DIABETES_130_PATH", ROOT / "data" / "us_diabetes_130" / "diabetic_data.csv"))],
+        "required": [Path(os.environ.get("US_DIABETES_130_PATH", discovered_data_path("us_diabetes_130", "diabetic_data.csv"))), RESULTS / "us_diabetes_130_metrics.csv", RESULTS / "us_diabetes_130_predictions.csv", RESULTS / "us_diabetes_130_confusion.csv"],
     },
     "mimic_iv_demo": {
         "id": "mimic_iv_demo",
         "name": "MIMIC-IV Demo",
         "setting": "Demo hospital records",
-        "target": "A documented encounter-level outcome supported by the supplied demo tables",
-        "state_definition": "Time-stamped admissions and measurements available before the index time",
+        "target": "In-hospital mortality",
+        "state_definition": "Admission demographic and administrative summary",
         "models": ["Logistic regression", "Random forest", "Histogram gradient boosting"],
         "limitations": "The demo subset is for pipeline checks and feasibility only; it is too small for generalizable clinical-performance claims.",
-        "required": [Path(os.environ.get("MIMIC_IV_DEMO_PATH", ROOT / "data" / "mimic_iv_demo" / "admissions.csv"))],
+        "required": [Path(os.environ.get("MIMIC_IV_DEMO_PATH", discovered_data_path("mimic_iv_demo", "admissions.csv.gz"))), RESULTS / "mimic_iv_demo_metrics.csv", RESULTS / "mimic_iv_demo_predictions.csv", RESULTS / "mimic_iv_demo_confusion.csv"],
     },
 }
 
@@ -52,10 +58,7 @@ def dataset_summary(dataset_id: str) -> dict[str, object]:
         raise KeyError(dataset_id)
     item = DATASETS[dataset_id]
     required = item["required"]
-    if dataset_id == "mimic_iv_demo":
-        ready = required[0].exists() or required[0].with_suffix(".csv.gz").exists()
-    else:
-        ready = all(path.exists() for path in required)
+    ready = all(path.exists() for path in required)
     return {
         key: value for key, value in item.items() if key != "required"
     } | {
