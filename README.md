@@ -10,7 +10,7 @@ The interface switches among three datasets without pooling them:
 | --- | --- | --- |
 | Shanghai T2D | CGM value 15, 30, or 60 minutes ahead | Ready when `results/` has been generated. |
 | Diabetes 130-US Hospitals | Future encounter outcome, such as readmission | Disabled until `data/us_diabetes_130/diabetic_data.csv` is supplied and audited. |
-| MIMIC-IV Demo | Documented encounter-level outcome | Disabled until compatible demo tables are supplied under `data/mimic_iv_demo/`. |
+| MIMIC-IV Demo | Documented encounter-level outcome | Disabled until `data/mimic_iv_demo/admissions.csv` or `.csv.gz` is supplied and audited. |
 
 The other datasets are deliberately unavailable until their data and target definitions are audited. The application never invents an accuracy score, forecast, or patient record for missing data.
 
@@ -58,6 +58,12 @@ Start the API in one terminal:
 
 Then open `http://127.0.0.1:8503`.
 
+If port 8503 is already in use, choose another local port:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_react_api.py --port 8504
+```
+
 For frontend development, run `npm --prefix frontend run dev` and open `http://127.0.0.1:5173`. The Vite development server proxies API calls to port 8503.
 
 ## Folder structure
@@ -71,7 +77,9 @@ scripts/run_react_api.py   React API runner
 configs/study.json         Fixed Shanghai evaluation settings
 tests/                     Leakage and metric tests
 docs/                      Research report and implementation guide
-Shangai Data/              Local supplied data; excluded from Git
+data/shanghai_t2d/         Local Shanghai T2D data; excluded from Git
+data/us_diabetes_130/      Location for Diabetes 130-US Hospitals data
+data/mimic_iv_demo/        Location for MIMIC-IV Demo data
 results/                   Local evaluated outputs; excluded from Git
 ```
 

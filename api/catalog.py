@@ -42,7 +42,7 @@ DATASETS = {
         "state_definition": "Time-stamped admissions and measurements available before the index time",
         "models": ["Logistic regression", "Random forest", "Histogram gradient boosting"],
         "limitations": "The demo subset is for pipeline checks and feasibility only; it is too small for generalizable clinical-performance claims.",
-        "required": [Path(os.environ.get("MIMIC_IV_DEMO_PATH", ROOT / "data" / "mimic_iv_demo"))],
+        "required": [Path(os.environ.get("MIMIC_IV_DEMO_PATH", ROOT / "data" / "mimic_iv_demo" / "admissions.csv"))],
     },
 }
 
@@ -51,12 +51,16 @@ def dataset_summary(dataset_id: str) -> dict[str, object]:
     if dataset_id not in DATASETS:
         raise KeyError(dataset_id)
     item = DATASETS[dataset_id]
-    ready = all(path.exists() for path in item["required"])
+    required = item["required"]
+    if dataset_id == "mimic_iv_demo":
+        ready = required[0].exists() or required[0].with_suffix(".csv.gz").exists()
+    else:
+        ready = all(path.exists() for path in required)
     return {
         key: value for key, value in item.items() if key != "required"
     } | {
         "status": "ready" if ready else "not_configured",
-        "required_path": str(item["required"][0]),
+        "required_path": str(required[0]),
         "message": (
             "Data and evaluated outputs are available locally."
             if ready

@@ -5,7 +5,7 @@ __pycache__/
 .pytest_cache/
 outputs/
 *.egg-info/
-Shangai Data/
+data/shanghai_t2d/
 archives/
 results/
 docs/.*/

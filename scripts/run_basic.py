@@ -19,7 +19,7 @@ from shanghai_t2d.features import build_supervised_dataset
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the standard-model ShanghaiT2DM workflow.")
-    parser.add_argument("--data-root", type=Path, default=Path("Shangai Data"))
+    parser.add_argument("--data-root", type=Path, default=Path("data/shanghai_t2d"))
     parser.add_argument("--config", type=Path, default=Path("configs/study.json"))
     parser.add_argument("--output", type=Path, default=Path("results"))
     parser.add_argument("--quick", action="store_true", help="Use three folds and 250 bootstrap samples.")
