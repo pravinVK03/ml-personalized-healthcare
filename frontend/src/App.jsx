@@ -152,37 +152,55 @@ export default function App() {
   const [model, setModel] = useState('gradient_boosting')
   const [state, setState] = useState(null)
   const [records, setRecords] = useState([])
+  const [recordsForDataset, setRecordsForDataset] = useState('')
   const [record, setRecord] = useState('')
   const [recordState, setRecordState] = useState(null)
   const [origin, setOrigin] = useState('')
   const [error, setError] = useState('')
 
-  useEffect(() => { get('/api/datasets').then(data => setDatasets(data.datasets)).catch(err => setError(err.message)) }, [])
   useEffect(() => {
-    setDataset(null); setParticipants([]); setParticipant(''); setEpisodes([]); setEpisode(''); setState(null); setRecords([]); setRecord(''); setRecordState(null); setOrigin(''); setModel(datasetId === 'shanghai_t2d' ? 'gradient_boosting' : 'logistic_regression'); setError('')
-    get(`/api/datasets/${datasetId}`).then(data => setDataset(data)).catch(err => setError(err.message))
+    let cancelled = false
+    get('/api/datasets').then(data => { if (!cancelled) setDatasets(data.datasets) }).catch(err => { if (!cancelled) setError(err.message) })
+    return () => { cancelled = true }
+  }, [])
+  useEffect(() => {
+    let cancelled = false
+    setDataset(null); setParticipants([]); setParticipant(''); setEpisodes([]); setEpisode(''); setState(null); setRecords([]); setRecordsForDataset(''); setRecord(''); setRecordState(null); setOrigin(''); setModel(datasetId === 'shanghai_t2d' ? 'gradient_boosting' : 'logistic_regression'); setError('')
+    get(`/api/datasets/${datasetId}`).then(data => { if (!cancelled) setDataset(data) }).catch(err => { if (!cancelled) setError(err.message) })
+    return () => { cancelled = true }
   }, [datasetId])
   useEffect(() => {
     if (dataset?.status !== 'ready' || datasetId !== 'shanghai_t2d') return
-    get(`/api/datasets/${datasetId}/participants`).then(data => { setParticipants(data.participants); setParticipant(data.participants[0] ?? '') }).catch(err => setError(err.message))
+    let cancelled = false
+    get(`/api/datasets/${datasetId}/participants`).then(data => { if (!cancelled) { setParticipants(data.participants); setParticipant(data.participants[0] ?? '') } }).catch(err => { if (!cancelled) setError(err.message) })
+    return () => { cancelled = true }
   }, [dataset, datasetId])
   useEffect(() => {
     if (dataset?.status !== 'ready' || datasetId === 'shanghai_t2d') return
-    get(`/api/datasets/${datasetId}/records?model=${model}`).then(data => { setRecords(data.records); setRecord(data.records[0]?.record_id ?? '') }).catch(err => setError(err.message))
+    let cancelled = false
+    setRecords([]); setRecordsForDataset(''); setRecord(''); setRecordState(null)
+    get(`/api/datasets/${datasetId}/records?model=${model}`).then(data => { if (!cancelled) { setRecords(data.records); setRecordsForDataset(datasetId); setRecord(data.records[0]?.record_id ?? '') } }).catch(err => { if (!cancelled) setError(err.message) })
+    return () => { cancelled = true }
   }, [dataset, datasetId, model])
   useEffect(() => {
-    if (!participant) return
-    get(`/api/datasets/${datasetId}/participants/${participant}/episodes`).then(data => { setEpisodes(data.episodes); setEpisode(data.episodes[0] ?? '') }).catch(err => setError(err.message))
+    if (datasetId !== 'shanghai_t2d' || !participant) return
+    let cancelled = false
+    get(`/api/datasets/${datasetId}/participants/${participant}/episodes`).then(data => { if (!cancelled) { setEpisodes(data.episodes); setEpisode(data.episodes[0] ?? '') } }).catch(err => { if (!cancelled) setError(err.message) })
+    return () => { cancelled = true }
   }, [datasetId, participant])
   useEffect(() => {
-    if (!episode) return
+    if (datasetId !== 'shanghai_t2d' || !participant || !episode) return
+    let cancelled = false
     const params = new URLSearchParams({ episode, model }); if (origin) params.set('origin', origin)
-    get(`/api/datasets/${datasetId}/participants/${participant}/state?${params}`).then(data => { setState(data); setOrigin(data.selected_origin) }).catch(err => setError(err.message))
+    get(`/api/datasets/${datasetId}/participants/${participant}/state?${params}`).then(data => { if (!cancelled) { setState(data); setOrigin(data.selected_origin) } }).catch(err => { if (!cancelled) setError(err.message) })
+    return () => { cancelled = true }
   }, [datasetId, participant, episode, model, origin])
   useEffect(() => {
-    if (!record || datasetId === 'shanghai_t2d') return
-    get(`/api/datasets/${datasetId}/records/${record}?model=${model}`).then(setRecordState).catch(err => setError(err.message))
-  }, [datasetId, record, model])
+    if (!record || datasetId === 'shanghai_t2d' || recordsForDataset !== datasetId) return
+    let cancelled = false
+    get(`/api/datasets/${datasetId}/records/${record}?model=${model}`).then(data => { if (!cancelled) setRecordState(data) }).catch(err => { if (!cancelled) setError(err.message) })
+    return () => { cancelled = true }
+  }, [datasetId, record, model, recordsForDataset])
 
   const selectedDataset = useMemo(() => datasets.find(item => item.id === datasetId), [datasets, datasetId])
   const best60 = dataset?.evaluation?.accuracy?.filter(row => row.horizon_minutes === 60).sort((a, b) => a.estimate - b.estimate)[0]

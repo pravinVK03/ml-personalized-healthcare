@@ -14,8 +14,9 @@ from .catalog import DATASETS, ROOT, all_datasets, dataset_summary
 from . import encounters, shanghai
 
 
-def response(data: object) -> JSONResponse:
-    return JSONResponse(data)
+def response(data: object, status_code: int = 200) -> JSONResponse:
+    """Return a JSON response for both successful and handled API errors."""
+    return JSONResponse(data, status_code=status_code)
 
 
 async def datasets(_request):
