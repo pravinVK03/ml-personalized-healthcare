@@ -7,8 +7,8 @@ This project deliberately keeps each dataset pipeline separate. The React interf
 | Dataset | Code to show | Prediction question | Models |
 |---|---|---|---|
 | Shanghai T2D | `src/shanghai_t2d/` | What will CGM glucose be in the next 30, 60, or 120 minutes? | Persistence, Ridge regression, Random forest, Histogram gradient boosting |
-| Diabetes 130-US Hospitals | `src/us_diabetes_130.py` | Will this encounter be readmitted within 30 days? | Logistic regression, Random forest, Histogram gradient boosting |
-| MIMIC-IV Demo | `src/mimic_iv_demo.py` | Will this admission end in in-hospital mortality? | Logistic regression, Random forest, Histogram gradient boosting |
+| Diabetes 130-US Hospitals | `src/us_diabetes_130.py` | Will this diabetes encounter be readmitted within 30 days? (diabetes type unavailable) | Logistic regression, Random forest, Histogram gradient boosting |
+| MIMIC-IV Demo T2D Cohort | `src/mimic_iv_demo.py` | Will an ICD-confirmed T2D admission end in in-hospital mortality? | Logistic regression, Random forest, Histogram gradient boosting |
 
 ## Shared integration
 
@@ -29,4 +29,4 @@ separate dataset module → held-out evaluation CSV files → FastAPI routes →
 
 - Call the displayed profile a **research patient digital twin**: a compact representation of available patient information for a specific prediction task.
 - Say **held-out evaluation**, rather than real-time prediction.
-- The MIMIC-IV Demo set is very small, so its metrics are a feasibility demonstration and not evidence of deployable clinical performance.
+- The MIMIC-IV Demo T2D cohort is very small (60 admissions, 17 patients), so its metrics are a feasibility demonstration and not evidence of deployable clinical performance.

@@ -126,14 +126,20 @@ function OutcomeGraph({ state, target }) {
 function Accuracy({ rows }) {
   const modelOrder = Object.fromEntries(MODELS.map(([id], index) => [id, index]))
   const sorted = [...rows].sort((a, b) => a.horizon_minutes - b.horizon_minutes || modelOrder[a.model] - modelOrder[b.model])
-  return <section className="panel"><h2>Overall held-out accuracy</h2><p>MAE is the average absolute forecast error in mg/dL. Lower is better. Every participant was held out of model training.</p>
+  const hourAhead = sorted.filter(row => row.horizon_minutes === 60)
+  const largestError = Math.max(...hourAhead.map(row => row.estimate), 1)
+  return <section className="panel"><p className="section-label">STEP 5 — HELD-OUT EVALUATION</p><h2>Overall held-out accuracy</h2><p>MAE is the average absolute forecast error in mg/dL. Lower is better. Every participant was held out of model training.</p>
+    <div className="performance-grid">{hourAhead.map(row => <article key={row.model}><strong>{row.model_label}</strong><span>60-minute MAE: {fmt(row.estimate, 2)} mg/dL</span><div className="performance-track" aria-label={`${row.model_label}: ${fmt(row.estimate, 2)} MAE, lower is better`}><i className="error-bar" style={{ width: `${(row.estimate / largestError) * 100}%` }} /></div><small>Shorter bar = lower error</small></article>)}</div>
     <div className="table-scroll"><table><thead><tr><th>Model</th><th>Minutes ahead</th><th>MAE</th><th>95% interval</th><th>Participants</th></tr></thead>
       <tbody>{sorted.map(row => <tr key={`${row.model}-${row.horizon_minutes}`}><td>{row.model_label}</td><td>{row.horizon_minutes}</td><td>{fmt(row.estimate, 2)}</td><td>{fmt(row.ci_2_5, 2)} to {fmt(row.ci_97_5, 2)}</td><td>{row.n_subjects}</td></tr>)}</tbody>
     </table></div></section>
 }
 
 function EncounterAccuracy({ rows }) {
-  return <section className="panel"><h2>Overall held-out accuracy</h2><p>Each model used a patient-held-out evaluation split. Balanced accuracy gives equal importance to both outcomes; ROC-AUC measures ranking ability. Higher is better.</p>
+  const smallSample = rows[0]?.n_test_patients < 30
+  return <section className="panel"><p className="section-label">STEP 5 — HELD-OUT EVALUATION</p><h2>Overall held-out accuracy</h2><p>Each model used a patient-held-out evaluation split. Balanced accuracy gives equal importance to both outcomes; ROC-AUC measures ranking ability. Higher is better.</p>
+    {smallSample && <p className="small-sample">Feasibility warning: this demo evaluation has only {rows[0]?.n_test_patients} held-out patients. The displayed values are not clinically generalizable.</p>}
+    <div className="performance-grid">{rows.map(row => <article key={row.model}><strong>{row.model_label}</strong><span>Balanced accuracy: {fmt(row.balanced_accuracy, 3)}</span><div className="performance-track"><i style={{ width: `${row.balanced_accuracy * 100}%` }} /></div><span>ROC-AUC: {fmt(row.roc_auc, 3)}</span><div className="performance-track"><i className="roc-bar" style={{ width: `${row.roc_auc * 100}%` }} /></div></article>)}</div>
     <div className="table-scroll"><table><thead><tr><th>Model</th><th>Balanced accuracy</th><th>ROC-AUC</th><th>Average precision</th><th>Test records</th><th>Positive outcome rate</th></tr></thead>
       <tbody>{rows.map(row => <tr key={row.model}><td>{row.model_label}</td><td>{fmt(row.balanced_accuracy, 3)}</td><td>{fmt(row.roc_auc, 3)}</td><td>{fmt(row.average_precision, 3)}</td><td>{row.n_test}</td><td>{fmt(row.positive_rate_test * 100, 1)}%</td></tr>)}</tbody>
     </table></div></section>
@@ -160,6 +166,7 @@ function EncounterRecord({ state, target }) {
 function DatasetScope({ dataset }) {
   return <section className="panel scope"><p className="section-label">STUDY OVERVIEW</p><h2>{dataset.name}</h2><dl>
     <dt>Care setting</dt><dd>{dataset.setting}</dd>
+    <dt>Cohort definition</dt><dd>{dataset.cohort_definition}</dd>
     <dt>Models compared</dt><dd>{dataset.models.join(', ')}</dd>
     <dt>Interpret carefully</dt><dd>{dataset.limitations}</dd>
   </dl></section>
@@ -233,7 +240,7 @@ export default function App() {
   const availableModels = isShanghai ? MODELS : ENCOUNTER_MODELS
 
   return <main>
-    <header><div><p className="eyebrow">RETROSPECTIVE RESEARCH DASHBOARD</p><h1>Type 2 Diabetes<br />Patient Digital Twin</h1><p className="subtitle">Three separate dataset pipelines, integrated into one clear research interface. Results are retrospective and are not clinical advice.</p></div><div className="header-stats"><span>3 datasets</span><span>Standard scikit-learn models</span><span>Held-out evaluation</span></div></header>
+    <header><div><p className="eyebrow">RETROSPECTIVE RESEARCH DASHBOARD</p><h1>T2D-Focused Patient State<br />and Future Outcome Modelling</h1><p className="subtitle">Three separate datasets are shown with their cohort definitions. Results are retrospective research outputs, not clinical advice.</p></div><div className="header-stats"><span>3 datasets</span><span>Standard scikit-learn models</span><span>Held-out evaluation</span></div></header>
     {error && <Notice kind="error">{error}</Notice>}
     <section className="dataset-picker"><div><p className="section-label">STEP 1</p><h2>Choose a study dataset</h2><p>Each dataset has its own target, features, and evaluation. Select one to inspect its patient-state example and model results.</p></div><div className="dataset-cards">{datasets.map(item => <DatasetCard key={item.id} item={item} selected={item.id === datasetId} onSelect={() => setDatasetId(item.id)} />)}</div></section>
     {selectedDataset && <DatasetScope dataset={dataset ?? selectedDataset} />}

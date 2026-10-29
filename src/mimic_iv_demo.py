@@ -12,12 +12,22 @@ from encounter_common import EncounterStudy, SEED, find_file, model_pipeline
 def load_study(root):
     admissions = pd.read_csv(find_file(root, "admissions.csv.gz"), compression="gzip")
     patients = pd.read_csv(find_file(root, "patients.csv.gz"), compression="gzip")
-    frame = admissions.merge(patients[["subject_id", "gender", "anchor_age"]], on="subject_id", how="left")
+    diagnoses = pd.read_csv(find_file(root, "diagnoses_icd.csv.gz"), compression="gzip", dtype={"icd_code": str})
+    # Cohort definition: documented Type 2 diabetes diagnosis.  The code is
+    # used only to identify the retrospective cohort, never as a model feature.
+    type_2 = diagnoses.loc[
+        ((diagnoses["icd_version"] == 10) & diagnoses["icd_code"].str.startswith("E11", na=False))
+        | ((diagnoses["icd_version"] == 9) & diagnoses["icd_code"].str.match(r"^250..[02]$", na=False)),
+        "hadm_id",
+    ].drop_duplicates()
+    frame = admissions.loc[admissions["hadm_id"].isin(type_2)].merge(
+        patients[["subject_id", "gender", "anchor_age"]], on="subject_id", how="left"
+    )
     numeric = ("anchor_age",)
     categorical = ("gender", "admission_type", "admission_location", "insurance", "language", "marital_status", "race")
     selected = frame.loc[:, ["subject_id", "hospital_expire_flag", *numeric, *categorical]].copy()
     selected["target"] = selected["hospital_expire_flag"].astype(int)
-    return EncounterStudy("mimic_iv_demo", "MIMIC-IV Demo", "In-hospital mortality", "Admission demographic and administrative summary", "subject_id", (*numeric, *categorical), numeric, selected)
+    return EncounterStudy("mimic_iv_demo", "MIMIC-IV Demo T2D Cohort", "In-hospital mortality", "Admission demographic and administrative summary", "subject_id", (*numeric, *categorical), numeric, selected)
 
 
 def models(study):
