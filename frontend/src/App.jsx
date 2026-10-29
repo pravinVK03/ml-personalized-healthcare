@@ -68,6 +68,22 @@ function StudyMap({ datasetId, dataset }) {
   </section>
 }
 
+function StudyPurpose({ dataset }) {
+  return <section className="panel purpose-panel">
+    <p className="section-label">STEP 2 — PURPOSE, INPUTS, AND FORECAST</p>
+    <h2>What is forecasted, using which inputs?</h2>
+    <p className="purpose-copy">{dataset.purpose}</p>
+    <div className="forecast-flow" aria-label="Prediction flow">
+      <article><span>1. Input boundary</span><strong>{dataset.input_boundary}</strong></article>
+      <i aria-hidden="true">→</i>
+      <article><span>2. Patient state</span><strong>{dataset.state_definition}</strong></article>
+      <i aria-hidden="true">→</i>
+      <article className="forecast-result"><span>3. Forecasted result</span><strong>{dataset.target}</strong></article>
+    </div>
+    <div className="feature-area"><div><h3>Features used by the model</h3><p>Feature groups are kept specific to this dataset and prediction question.</p></div><div className="feature-groups">{dataset.feature_groups?.map(group => <article key={group.name}><strong>{group.name}</strong><ul>{group.items.map(item => <li key={item}>{item}</li>)}</ul></article>)}</div></div>
+  </section>
+}
+
 function LineChart({ history, forecast }) {
   const values = [...history.map(point => point.cgm), ...forecast.map(point => point.forecast_cgm), ...forecast.map(point => point.measured_later_cgm)]
   if (!values.length) return null
@@ -98,6 +114,15 @@ function LineChart({ history, forecast }) {
   </div>
 }
 
+function OutcomeGraph({ state, target }) {
+  if (!state) return null
+  const percent = Math.round(state.predicted_probability * 100)
+  return <section className="panel outcome-graph"><p className="section-label">PATIENT STATE TO OUTCOME</p><h2>Outcome path for this held-out encounter</h2><p>{target}. This is a single encounter prediction, not a disease trajectory: this source has no repeated within-person time series.</p>
+    <div className="outcome-track" role="img" aria-label={`Predicted probability ${percent} percent`}><span className="outcome-fill" style={{ width: `${percent}%` }} /><b style={{ left: `${percent}%` }}>{percent}%</b></div>
+    <div className="outcome-labels"><span>Lower predicted probability</span><span>Higher predicted probability</span></div>
+  </section>
+}
+
 function Accuracy({ rows }) {
   const modelOrder = Object.fromEntries(MODELS.map(([id], index) => [id, index]))
   const sorted = [...rows].sort((a, b) => a.horizon_minutes - b.horizon_minutes || modelOrder[a.model] - modelOrder[b.model])
@@ -119,10 +144,11 @@ function EncounterRecord({ state, target }) {
   const outcome = state.observed_outcome ? 'Yes' : 'No'
   const predicted = state.predicted_class ? 'Yes' : 'No'
   return <>
-    <section className="panel"><h2>Recorded encounter state</h2><p>{target}. These are the documented fields supplied to the model for this held-out record.</p>
+    <section className="panel"><p className="section-label">STEP 4 — SELECTED PATIENT STATE</p><h2>Patient state at the prediction time</h2><p>{target}. These are the documented fields supplied to the model for this held-out record.</p>
       <div className="table-scroll"><table><thead><tr><th>Field</th><th>Recorded value</th></tr></thead><tbody>{Object.entries(state.state).map(([key, value]) => <tr key={key}><td>{key.replaceAll('_', ' ')}</td><td>{String(value ?? 'Not recorded')}</td></tr>)}</tbody></table></div>
     </section>
-    <section className="panel"><h2>Held-out outcome evaluation</h2><p>The observed outcome is shown only for retrospective evaluation; it was not available to the model when predicting.</p><div className="metrics">
+    <OutcomeGraph state={state} target={target} />
+    <section className="panel"><p className="section-label">SELECTED RECORD RESULT</p><h2>Held-out outcome result</h2><p>The observed outcome is shown only for retrospective evaluation; it was not available to the model when predicting.</p><div className="metrics">
       <Metric label="Predicted probability" value={`${fmt(state.predicted_probability * 100, 1)}%`} />
       <Metric label="Predicted outcome" value={predicted} />
       <Metric label="Observed outcome" value={outcome} />
@@ -134,8 +160,6 @@ function EncounterRecord({ state, target }) {
 function DatasetScope({ dataset }) {
   return <section className="panel scope"><p className="section-label">STUDY OVERVIEW</p><h2>{dataset.name}</h2><dl>
     <dt>Care setting</dt><dd>{dataset.setting}</dd>
-    <dt>Question answered</dt><dd>{dataset.target}</dd>
-    <dt>Information used</dt><dd>{dataset.state_definition}</dd>
     <dt>Models compared</dt><dd>{dataset.models.join(', ')}</dd>
     <dt>Interpret carefully</dt><dd>{dataset.limitations}</dd>
   </dl></section>
@@ -215,28 +239,29 @@ export default function App() {
     {selectedDataset && <DatasetScope dataset={dataset ?? selectedDataset} />}
     {unavailable && <Notice>This dataset is intentionally disabled: {dataset.message} Expected location: <code>{dataset.required_path}</code>. No model, forecast, or accuracy result is shown until compatible data are audited and evaluated.</Notice>}
     {dataset?.status === 'ready' && <>
+      <StudyPurpose dataset={dataset} />
       <StudyMap datasetId={datasetId} dataset={dataset} />
       {isShanghai && best60 && <Notice><strong>Best 60-minute result:</strong> {best60.model_label}, average error {fmt(best60.estimate, 2)} mg/dL. This is a held-out retrospective result.</Notice>}
-      {isShanghai ? <><section className="selection panel"><p className="section-label">STEP 2</p><h2>Choose a held-out CGM record</h2><div className="controls">
+      {isShanghai ? <><section className="selection panel"><p className="section-label">STEP 3</p><h2>Choose a held-out CGM record</h2><div className="controls">
         <label>Study participant<select value={participant} onChange={event => setParticipant(event.target.value)}>{participants.map(item => <option key={item}>{item}</option>)}</select></label>
         <label>CGM recording<select value={episode} onChange={event => setEpisode(event.target.value)}>{episodes.map(item => <option key={item}>{item}</option>)}</select></label>
         <label>Model<select value={model} onChange={event => setModel(event.target.value)}>{availableModels.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
         <label>Prediction time<select value={origin} onChange={event => setOrigin(event.target.value)}>{state?.origins?.map(item => <option key={item} value={item}>{date(item)}</option>)}</select></label>
       </div></section>
       {state && <>
-        <section className="panel"><h2>Recorded CGM state</h2><p>These are past measurements already available before the chosen prediction time.</p><div className="metrics">
+        <section className="panel"><p className="section-label">STEP 4 — PATIENT STATE</p><h2>Patient state at the prediction time</h2><p>These are past measurements already available before the chosen prediction time.</p><div className="metrics">
           <Metric label="Last CGM measurement" value={fmt(state.state.last_cgm_mg_dl)} unit="mg/dL" />
           <Metric label="Change over previous hour" value={`${state.state.one_hour_change_mg_dl >= 0 ? '+' : ''}${fmt(state.state.one_hour_change_mg_dl)}`} unit="mg/dL" />
           <Metric label="Mean over last six hours" value={fmt(state.state.six_hour_mean_mg_dl)} unit="mg/dL" />
           <Metric label="Variation over last six hours" value={fmt(state.state.six_hour_variation_mg_dl)} unit="mg/dL" />
           <Metric label="Direction over previous hour" value={state.state.direction} />
         </div></section>
-        <section className="panel"><h2>Held-out forecast evaluation</h2><p>The later CGM measurement is visible here only because this is retrospective evaluation. It was not available at the prediction time.</p><LineChart history={state.history} forecast={state.forecast} />
+        <section className="panel"><p className="section-label">DISEASE TRAJECTORY</p><h2>Recorded glucose path and forecast</h2><p>{dataset.trajectory_note} The later CGM measurement is visible only because this is retrospective evaluation; it was not available at the prediction time.</p><LineChart history={state.history} forecast={state.forecast} />
           <div className="table-scroll"><table><thead><tr><th>Minutes ahead</th><th>Later measurement time</th><th>Forecast CGM</th><th>Measured later CGM</th><th>Absolute error</th></tr></thead><tbody>{state.forecast.map(row => <tr key={row.minutes_ahead}><td>{row.minutes_ahead}</td><td>{date(row.time)}</td><td>{fmt(row.forecast_cgm)}</td><td>{fmt(row.measured_later_cgm)}</td><td>{fmt(row.absolute_error)}</td></tr>)}</tbody></table></div>
         </section>
       </>}
       {dataset.evaluation && <Accuracy rows={dataset.evaluation.accuracy} />}</> : <>
-        <section className="selection panel"><p className="section-label">STEP 2</p><h2>Choose a held-out encounter</h2><div className="controls">
+        <section className="selection panel"><p className="section-label">STEP 3</p><h2>Choose a held-out encounter</h2><div className="controls">
           <label>Model<select value={model} onChange={event => setModel(event.target.value)}>{availableModels.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
           <label>Held-out record<select value={record} onChange={event => setRecord(event.target.value)}>{records.map(item => <option key={item.record_id} value={item.record_id}>Patient {item.patient_id} — record {item.record_id}</option>)}</select></label>
         </div></section>
