@@ -1,89 +1,83 @@
-# ShanghaiT2DM CGM forecasting
+# Multi Dataset Patient State Research Framework
 
-A clear, research-only implementation for short-term continuous glucose monitoring (CGM) forecasting in the supplied ShanghaiT2DM data. It is deliberately small, uses standard scikit-learn models, and keeps patients separate between training and evaluation.
+This is a grounded, retrospective research prototype for patient-state modelling and short-term outcome forecasting. It provides a React interface and a Python API. It is not a clinical system, a physiological simulation, or treatment decision support.
 
-It forecasts CGM **15, 30, and 60 minutes ahead**. The dataset does not provide enough long-term repeat follow-up for next-HbA1c, medication-response, or long-term disease-progression claims.
+## What is implemented
 
-## Run
+The interface switches among three datasets without pooling them:
 
-From this folder in PowerShell:
+| Dataset | Supported unit and target | Local status |
+| --- | --- | --- |
+| Shanghai T2D | CGM value 15, 30, or 60 minutes ahead | Ready when `results/` has been generated. |
+| Diabetes 130-US Hospitals | Future encounter outcome, such as readmission | Disabled until `data/us_diabetes_130/diabetic_data.csv` is supplied and audited. |
+| MIMIC-IV Demo | Documented encounter-level outcome | Disabled until compatible demo tables are supplied under `data/mimic_iv_demo/`. |
 
-```powershell
-.\.venv\Scripts\python.exe scripts\run_basic.py
-.\.venv\Scripts\python.exe -m streamlit run app.py --server.port 8502
-```
+The other datasets are deliberately unavailable until their data and target definitions are audited. The application never invents an accuracy score, forecast, or patient record for missing data.
 
-Open `http://localhost:8502` if it does not open automatically. The first command creates `results/`; the second command displays it.
+## Patient state representation
 
-To recreate the environment on another computer:
+For Shanghai T2D, the displayed patient state is a transparent summary of measurements available before the selected prediction time:
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-```
+- Last recorded CGM value.
+- Change over the previous hour.
+- Mean and variation over the previous six hours.
+- Direction over the previous hour.
 
-## What the implementation does
-
-1. Reads the supplied CGM episode files from `Shangai Data/`.
-2. Keeps only continuous 15-minute CGM periods and builds a six-hour past-only history for each prediction time.
-3. Splits data by **patient** into five folds. A patient is never in both training and test data.
-4. Fits four understandable models: persistence, ridge regression, random forest, and histogram gradient boosting.
-5. Saves only the held-out predictions, per-patient metrics, overall accuracy, and glucose-band counts used by the dashboard.
+This is a computational state representation for research. It is not a biological or clinical digital twin.
 
 ## Models
 
-| Model | Role |
-| --- | --- |
-| Persistence | Simple baseline: future CGM equals the latest measurement. |
-| Ridge regression | Regularised linear model using CGM history and simple time/rolling features. |
-| Random forest | Standard nonlinear tree model. |
-| Histogram gradient boosting | Standard nonlinear tree model and selected primary model when it has lowest held-out MAE. |
+The Shanghai pipeline uses standard scikit-learn models: persistence, ridge regression, random forest, and histogram gradient boosting. Evaluation holds out entire patients. The primary accuracy measure is subject-macro mean absolute error (MAE) in mg/dL.
 
-No neural network or ensemble is included. The four models already cover baseline, linear, and nonlinear methods; adding more complexity would make the project harder to explain without a pre-specified, validated benefit.
+No RNN is included. The current datasets do not share a validated longitudinal target or comparable time scale, so an RNN would add complexity without a fair, supported cross-dataset evaluation.
 
-## Dashboard
+## Run Shanghai preprocessing
 
-The Streamlit dashboard has five concise sections:
+The supplied Shanghai data stay local and are not committed to Git.
 
-- **Current state:** latest measured CGM history for one research participant and episode.
-- **Forecast:** a selected saved held-out forecast with its later observed value.
-- **Accuracy:** patient-held-out MAE and 95% patient-bootstrap intervals.
-- **Patient heatmap:** per-patient MAE across the three forecast horizons.
-- **Confusion matrix:** descriptive observed-versus-predicted glucose bands.
+```powershell
+.\.venv\Scripts\python.exe scripts\run_basic.py
+```
 
-“Research Digital Twin” is a UI label for a patient's measured history and model forecast. It is not a physiological simulation, a medical device, or clinical decision support.
+This writes four private local result tables required by the React interface: held-out forecasts, aggregate metrics, participant metrics, and glucose-range agreement counts.
+
+## Run the React application
+
+Install frontend packages once:
+
+```powershell
+npm --prefix frontend install
+npm --prefix frontend run build
+```
+
+Start the API in one terminal:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_react_api.py
+```
+
+Then open `http://127.0.0.1:8503`.
+
+For frontend development, run `npm --prefix frontend run dev` and open `http://127.0.0.1:5173`. The Vite development server proxies API calls to port 8503.
 
 ## Folder structure
 
 ```text
-app.py                     Streamlit dashboard
-configs/study.json         Fixed study settings
-scripts/run_basic.py       One command that builds and evaluates the models
-src/shanghai_t2d/          Data, features, models, evaluation, and plots
-Shangai Data/              Supplied dataset (unchanged)
-results/                   Generated study outputs used by the app
-tests/                     Small data and leakage-control tests
-docs/                      Final project report and implementation guide
+api/                       Python API and dataset catalogue
+frontend/                  React interface
+src/shanghai_t2d/          Shanghai preprocessing and standard models
+scripts/run_basic.py       Shanghai evaluation runner
+scripts/run_react_api.py   React API runner
+configs/study.json         Fixed Shanghai evaluation settings
+tests/                     Leakage and metric tests
+docs/                      Research report and implementation guide
+Shangai Data/              Local supplied data; excluded from Git
+results/                   Local evaluated outputs; excluded from Git
 ```
 
-`healthtwin/` is a separate existing project and has deliberately not been modified.
+## Limits
 
-The only active files in `results/` are:
-
-- `predictions.csv` — held-out forecasts used for the patient view.
-- `patient_metrics.csv` — MAE for each patient.
-- `metrics.csv` — overall accuracy and confidence intervals.
-- `zone_confusion.csv` — counts for the glucose-band confusion matrix.
-
-## Result interpretation
-
-The primary number is the **60-minute subject-macro MAE** in mg/dL: lower is better. “Subject-macro” means each of the 100 held-out patients receives equal weight, rather than allowing people with longer recordings to dominate. The reported confidence intervals resample patients, not individual CGM rows.
-
-## Checks
-
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-```
-
-The saved outputs are research evidence only. Do not use them to recommend insulin, medication, diet, or treatment changes.
+- Dataset-specific units, timelines, features, and outcomes are not automatically comparable or pooled.
+- Diabetes 130-US Hospitals has categorical HbA1c data; this project must not claim numerical HbA1c trajectories from it.
+- MIMIC-IV Demo is suitable for pipeline feasibility work, not generalizable clinical-performance claims.
+- Any new dataset needs a target definition, leakage audit, patient-level split strategy, and documented preprocessing before its results can be enabled.
