@@ -14,6 +14,8 @@ The interface switches among three datasets without pooling them:
 
 The datasets are never pooled. The two hospital datasets are not CGM trajectories: they show a documented encounter state and a held-out binary-outcome evaluation, while Shanghai T2D shows a short-term CGM forecast.
 
+For a short walkthrough of which code to present for each study, read [CODE_MAP.md](CODE_MAP.md).
+
 ## Patient state representation
 
 For Shanghai T2D, the displayed patient state is a transparent summary of measurements available before the selected prediction time:

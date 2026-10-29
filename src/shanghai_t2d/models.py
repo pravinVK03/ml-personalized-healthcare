@@ -8,6 +8,7 @@ from sklearn.pipeline import Pipeline
 
 
 def fit_hist_gradient_boosting(x, y, *, random_seed: int) -> Pipeline:
+    # Model: Histogram Gradient Boosting Regressor
     model = Pipeline(
         [
             ("imputer", SimpleImputer(strategy="median")),

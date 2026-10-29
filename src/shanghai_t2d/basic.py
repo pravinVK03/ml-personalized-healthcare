@@ -22,6 +22,7 @@ GLUCOSE_BANDS = ["Below 70", "70 to 180", "Above 180"]
 
 
 def _fit_standard_ridge(x: pd.DataFrame, y: pd.Series) -> Pipeline:
+    # Model: Ridge Regression
     model = Pipeline(
         [
             ("imputer", SimpleImputer(strategy="median")),
@@ -35,6 +36,7 @@ def _fit_standard_ridge(x: pd.DataFrame, y: pd.Series) -> Pipeline:
 
 def _fit_random_forest(x: pd.DataFrame, y: pd.Series, *, random_seed: int) -> Pipeline:
     """Fit a bounded standard random forest suitable for the available CGM sample size."""
+    # Model: Random Forest Regressor
     model = Pipeline(
         [
             ("imputer", SimpleImputer(strategy="median")),
@@ -123,17 +125,20 @@ def evaluate_basic(
                     "fold",
                 ]
             ].copy()
+            # Model: Persistence Baseline
             persistence = base.copy()
             persistence["model"] = "persistence"
             persistence["prediction"] = persistence["current_cgm"]
             prediction_frames.append(persistence)
 
+            # Model: Ridge Regression
             ridge = _fit_standard_ridge(train[history_columns], train["target_cgm"])
             ridge_result = base.copy()
             ridge_result["model"] = "ridge"
             ridge_result["prediction"] = ridge.predict(test[history_columns])
             prediction_frames.append(ridge_result)
 
+            # Model: Random Forest Regressor
             forest = _fit_random_forest(
                 train[history_columns], train["target_cgm"], random_seed=config.random_seed + fold
             )
@@ -142,6 +147,7 @@ def evaluate_basic(
             forest_result["prediction"] = forest.predict(test[history_columns])
             prediction_frames.append(forest_result)
 
+            # Model: Histogram Gradient Boosting Regressor
             hgb = fit_hist_gradient_boosting(
                 train[history_columns],
                 train["target_cgm"],

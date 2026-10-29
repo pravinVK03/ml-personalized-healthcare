@@ -14,6 +14,26 @@ const ENCOUNTER_MODELS = [
   ['histogram_gradient_boosting', 'Histogram gradient boosting'],
 ]
 
+// Keep the presentation map beside the integrated UI.  Each dataset still has
+// its own loading and model module; only the results are brought together here.
+const CODE_AREAS = {
+  shanghai_t2d: {
+    source: 'src/shanghai_t2d/',
+    approach: 'CGM history → future glucose forecast',
+    evaluation: 'Patient-grouped cross-validation',
+  },
+  us_diabetes_130: {
+    source: 'src/us_diabetes_130.py',
+    approach: 'Discharge encounter summary → 30-day readmission',
+    evaluation: 'Patient-held-out test split',
+  },
+  mimic_iv_demo: {
+    source: 'src/mimic_iv_demo.py',
+    approach: 'Admission summary → in-hospital mortality',
+    evaluation: 'Patient-held-out demo test split',
+  },
+}
+
 const fmt = (value, digits = 1) => Number(value).toFixed(digits)
 const date = (value) => new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -23,6 +43,29 @@ function Metric({ label, value, unit = '' }) {
 
 function Notice({ children, kind = 'info' }) {
   return <div className={`notice ${kind}`}>{children}</div>
+}
+
+function DatasetCard({ item, selected, onSelect }) {
+  const ready = item.status === 'ready'
+  return <button className={`dataset-card ${selected ? 'selected' : ''}`} onClick={onSelect} type="button" aria-pressed={selected}>
+    <span className={`status-dot ${ready ? 'ready' : ''}`} aria-hidden="true" />
+    <span className="dataset-card-body"><strong>{item.name}</strong><small>{item.target}</small></span>
+    <span className={`status-label ${ready ? 'ready' : ''}`}>{ready ? 'Results ready' : 'Data needed'}</span>
+  </button>
+}
+
+function StudyMap({ datasetId, dataset }) {
+  const code = CODE_AREAS[datasetId]
+  if (!code || !dataset) return null
+  return <section className="panel study-map">
+    <div><p className="section-label">CODE AND EVALUATION</p><h2>How this study is organised</h2><p>Dataset processing and model training stay separate. The dashboard only presents their saved, held-out results.</p></div>
+    <div className="map-grid">
+      <article><span>Dataset module</span><strong><code>{code.source}</code></strong></article>
+      <article><span>Prediction flow</span><strong>{code.approach}</strong></article>
+      <article><span>Evaluation design</span><strong>{code.evaluation}</strong></article>
+      <article><span>Shared support</span><strong><code>{datasetId === 'shanghai_t2d' ? 'src/shanghai_t2d/evaluation.py' : 'src/encounter_common.py'}</code></strong></article>
+    </div>
+  </section>
 }
 
 function LineChart({ history, forecast }) {
@@ -89,12 +132,12 @@ function EncounterRecord({ state, target }) {
 }
 
 function DatasetScope({ dataset }) {
-  return <section className="panel scope"><h2>{dataset.name}</h2><dl>
-    <dt>Clinical setting</dt><dd>{dataset.setting}</dd>
-    <dt>Supported prediction target</dt><dd>{dataset.target}</dd>
-    <dt>Patient state representation</dt><dd>{dataset.state_definition}</dd>
-    <dt>Model family</dt><dd>{dataset.models.join(', ')}</dd>
-    <dt>Important limitation</dt><dd>{dataset.limitations}</dd>
+  return <section className="panel scope"><p className="section-label">STUDY OVERVIEW</p><h2>{dataset.name}</h2><dl>
+    <dt>Care setting</dt><dd>{dataset.setting}</dd>
+    <dt>Question answered</dt><dd>{dataset.target}</dd>
+    <dt>Information used</dt><dd>{dataset.state_definition}</dd>
+    <dt>Models compared</dt><dd>{dataset.models.join(', ')}</dd>
+    <dt>Interpret carefully</dt><dd>{dataset.limitations}</dd>
   </dl></section>
 }
 
@@ -148,14 +191,15 @@ export default function App() {
   const availableModels = isShanghai ? MODELS : ENCOUNTER_MODELS
 
   return <main>
-    <header><div><p className="eyebrow">RETROSPECTIVE RESEARCH ONLY</p><h1>Patient State and Forecasting</h1><p className="subtitle">A transparent interface for comparing dataset-specific patient-state models. It is not a physiological simulation, live monitoring system, or clinical decision tool.</p></div></header>
+    <header><div><p className="eyebrow">RETROSPECTIVE RESEARCH DASHBOARD</p><h1>Type 2 Diabetes<br />Patient Digital Twin</h1><p className="subtitle">Three separate dataset pipelines, integrated into one clear research interface. Results are retrospective and are not clinical advice.</p></div><div className="header-stats"><span>3 datasets</span><span>Standard scikit-learn models</span><span>Held-out evaluation</span></div></header>
     {error && <Notice kind="error">{error}</Notice>}
-    <section className="dataset-picker"><label htmlFor="dataset">Dataset</label><select id="dataset" value={datasetId} onChange={event => setDatasetId(event.target.value)}>{datasets.map(item => <option key={item.id} value={item.id}>{item.name} — {item.status === 'ready' ? 'ready' : 'not configured'}</option>)}</select></section>
+    <section className="dataset-picker"><div><p className="section-label">STEP 1</p><h2>Choose a study dataset</h2><p>Each dataset has its own target, features, and evaluation. Select one to inspect its patient-state example and model results.</p></div><div className="dataset-cards">{datasets.map(item => <DatasetCard key={item.id} item={item} selected={item.id === datasetId} onSelect={() => setDatasetId(item.id)} />)}</div></section>
     {selectedDataset && <DatasetScope dataset={dataset ?? selectedDataset} />}
     {unavailable && <Notice>This dataset is intentionally disabled: {dataset.message} Expected location: <code>{dataset.required_path}</code>. No model, forecast, or accuracy result is shown until compatible data are audited and evaluated.</Notice>}
     {dataset?.status === 'ready' && <>
-      {isShanghai && best60 && <Notice><strong>Current best 60-minute Shanghai result:</strong> {best60.model_label}, MAE {fmt(best60.estimate, 2)} mg/dL. This is a held-out retrospective result.</Notice>}
-      {isShanghai ? <><section className="selection panel"><h2>Select a held-out study record</h2><div className="controls">
+      <StudyMap datasetId={datasetId} dataset={dataset} />
+      {isShanghai && best60 && <Notice><strong>Best 60-minute result:</strong> {best60.model_label}, average error {fmt(best60.estimate, 2)} mg/dL. This is a held-out retrospective result.</Notice>}
+      {isShanghai ? <><section className="selection panel"><p className="section-label">STEP 2</p><h2>Choose a held-out CGM record</h2><div className="controls">
         <label>Study participant<select value={participant} onChange={event => setParticipant(event.target.value)}>{participants.map(item => <option key={item}>{item}</option>)}</select></label>
         <label>CGM recording<select value={episode} onChange={event => setEpisode(event.target.value)}>{episodes.map(item => <option key={item}>{item}</option>)}</select></label>
         <label>Model<select value={model} onChange={event => setModel(event.target.value)}>{availableModels.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
@@ -174,7 +218,7 @@ export default function App() {
         </section>
       </>}
       {dataset.evaluation && <Accuracy rows={dataset.evaluation.accuracy} />}</> : <>
-        <section className="selection panel"><h2>Select a held-out encounter</h2><div className="controls">
+        <section className="selection panel"><p className="section-label">STEP 2</p><h2>Choose a held-out encounter</h2><div className="controls">
           <label>Model<select value={model} onChange={event => setModel(event.target.value)}>{availableModels.map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
           <label>Held-out record<select value={record} onChange={event => setRecord(event.target.value)}>{records.map(item => <option key={item.record_id} value={item.record_id}>Patient {item.patient_id} — record {item.record_id}</option>)}</select></label>
         </div></section>
