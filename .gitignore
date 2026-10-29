@@ -6,6 +6,10 @@ __pycache__/
 outputs/
 *.egg-info/
 data/shanghai_t2d/
+data/us_diabetes_130/**
+!data/us_diabetes_130/README.md
+data/mimic_iv_demo/**
+!data/mimic_iv_demo/README.md
 archives/
 results/
 docs/.*/
